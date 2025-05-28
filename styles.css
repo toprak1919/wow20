@@ -935,9 +935,99 @@ body {
         width: 300px;
         height: 150px;
     }
-    
+
     .action-slot {
         width: 40px;
         height: 40px;
     }
+}
+
+@media (max-width: 768px) {
+    #player-frame,
+    #target-frame {
+        width: 150px;
+    }
+
+    #minimap {
+        width: 120px;
+        height: 120px;
+    }
+
+    #chat-box {
+        width: 250px;
+        height: 120px;
+    }
+
+    .action-slot {
+        width: 35px;
+        height: 35px;
+    }
+
+    #mobile-controls {
+        display: block;
+    }
+}
+
+@media (max-width: 480px) {
+    #player-frame,
+    #target-frame {
+        width: 130px;
+    }
+
+    #chat-box {
+        width: 200px;
+        height: 100px;
+    }
+
+    .action-slot {
+        width: 30px;
+        height: 30px;
+    }
+}
+
+/* Mobile Controls */
+#mobile-controls {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    display: none;
+    z-index: 2000;
+}
+
+#joystick {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    position: relative;
+    touch-action: none;
+}
+
+#joystick .stick {
+    width: 40px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    position: absolute;
+    top: 20px;
+    left: 20px;
+}
+
+.mobile-buttons {
+    position: absolute;
+    bottom: 0;
+    right: -100px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.mobile-action {
+    width: 50px;
+    height: 50px;
+    background: rgba(0, 0, 0, 0.7);
+    border: 2px solid #333;
+    border-radius: 5px;
+    color: white;
+    font-size: 16px;
 }
