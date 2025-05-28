@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WoW Clone - 3D MMORPG</title>
+    <script>
+        // More comprehensive protection against extension conflicts
+        (function() {
+            // Override customElements.define to prevent duplicate definitions
+            const originalDefine = customElements.define;
+            const definedElements = new Set();
+            
+            customElements.define = function(name, constructor, options) {
+                try {
+                    if (!customElements.get(name) && !definedElements.has(name)) {
+                        definedElements.add(name);
+                        originalDefine.call(this, name, constructor, options);
+                    } else {
+                        console.warn('Prevented duplicate custom element definition:', name);
+                    }
+                } catch (error) {
+                    console.warn('Custom element definition error suppressed:', name, error.message);
+                }
+            };
+
+            // Catch unhandled promise rejections
+            window.addEventListener('unhandledrejection', (event) => {
+                if (event.reason && event.reason.message && 
+                    event.reason.message.includes('autosize-textarea')) {
+                    event.preventDefault();
+                    console.log('Suppressed autosize-textarea rejection');
+                }
+            });
+
+            // Global error handler for extension conflicts
+            const originalOnerror = window.onerror;
+            window.onerror = function(message, source, lineno, colno, error) {
+                // Suppress specific extension errors
+                if (source && (
+                    source.includes('webcomponents-ce.js') ||
+                    source.includes('overlay_bundle.js') ||
+                    source.includes('extension://') ||
+                    source.includes('chrome-extension://') ||
+                    source.includes('moz-extension://')
+                )) {
+                    console.log('Suppressed extension error:', message);
+                    return true; // Prevent default error handling
+                }
+                
+                // Suppress autosize-textarea errors specifically
+                if (message && message.includes('autosize-textarea')) {
+                    console.log('Suppressed autosize-textarea error:', message);
+                    return true;
+                }
+                
+                // Call original handler for legitimate errors
+                if (originalOnerror) {
+                    return originalOnerror.call(this, message, source, lineno, colno, error);
+                }
+                return false;
+            };
+
+            // Additional error event listener
+            window.addEventListener('error', (event) => {
+                if (event.filename && (
+                    event.filename.includes('webcomponents-ce.js') ||
+                    event.filename.includes('overlay_bundle.js') ||
+                    event.filename.includes('extension://') ||
+                    event.filename.includes('chrome-extension://') ||
+                    event.filename.includes('moz-extension://')
+                )) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    console.log('Event listener suppressed extension error:', event.message);
+                    return false;
+                }
+            }, true); // Use capture phase
+        })();
+    </script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="loading-screen">
+        <div class="loading-content">
+            <h1>World of WebCraft</h1>
+            <div class="loading-bar">
+                <div class="loading-progress"></div>
+            </div>
+            <p class="loading-text">Loading world...</p>
+        </div>
+    </div>
+
+    <div id="character-selection" style="display: none;">
+        <h1>Select Your Character</h1>
+        <div class="character-list">
+            <div class="character-slot" data-class="warrior">
+                <h3>Warrior</h3>
+                <p>Tank/Melee DPS</p>
+            </div>
+            <div class="character-slot" data-class="mage">
+                <h3>Mage</h3>
+                <p>Ranged DPS</p>
+            </div>
+            <div class="character-slot" data-class="priest">
+                <h3>Priest</h3>
+                <p>Healer/DPS</p>
+            </div>
+            <div class="character-slot" data-class="rogue">
+                <h3>Rogue</h3>
+                <p>Melee DPS</p>
+            </div>
+        </div>
+        <button id="enter-world" disabled>Enter World</button>
+    </div>
+
+    <div id="game-container" style="display: none;">
+        <!-- 3D Canvas -->
+        <canvas id="game-canvas"></canvas>
+
+        <!-- UI Overlay -->
+        <div id="ui-overlay">
+            <!-- Player Frame -->
+            <div id="player-frame" class="unit-frame">
+                <div class="portrait"></div>
+                <div class="bars">
+                    <div class="health-bar">
+                        <div class="bar-fill health"></div>
+                        <span class="bar-text">100/100</span>
+                    </div>
+                    <div class="mana-bar">
+                        <div class="bar-fill mana"></div>
+                        <span class="bar-text">100/100</span>
+                    </div>
+                </div>
+                <div class="level">1</div>
+                <div class="name">Player</div>
+            </div>
+
+            <!-- Target Frame -->
+            <div id="target-frame" class="unit-frame" style="display: none;">
+                <div class="portrait"></div>
+                <div class="bars">
+                    <div class="health-bar">
+                        <div class="bar-fill health"></div>
+                        <span class="bar-text">100/100</span>
+                    </div>
+                </div>
+                <div class="level">1</div>
+                <div class="name">Target</div>
+            </div>
+
+            <!-- Action Bars -->
+            <div id="action-bars">
+                <div class="action-bar main-bar">
+                    <div class="action-slot" data-slot="1"><span>1</span></div>
+                    <div class="action-slot" data-slot="2"><span>2</span></div>
+                    <div class="action-slot" data-slot="3"><span>3</span></div>
+                    <div class="action-slot" data-slot="4"><span>4</span></div>
+                    <div class="action-slot" data-slot="5"><span>5</span></div>
+                    <div class="action-slot" data-slot="6"><span>6</span></div>
+                    <div class="action-slot" data-slot="7"><span>7</span></div>
+                    <div class="action-slot" data-slot="8"><span>8</span></div>
+                    <div class="action-slot" data-slot="9"><span>9</span></div>
+                    <div class="action-slot" data-slot="0"><span>0</span></div>
+                </div>
+            </div>
+
+            <!-- Chat Box -->
+            <div id="chat-box">
+                <div class="chat-tabs">
+                    <div class="chat-tab active" data-channel="general">General</div>
+                    <div class="chat-tab" data-channel="combat">Combat</div>
+                    <div class="chat-tab" data-channel="guild">Guild</div>
+                </div>
+                <div class="chat-messages" id="chat-messages"></div>
+                <input type="text" id="chat-input" placeholder="Press Enter to chat...">
+            </div>
+
+            <!-- Minimap -->
+            <div id="minimap">
+                <canvas id="minimap-canvas" width="150" height="150"></canvas>
+                <div class="minimap-buttons">
+                    <button class="minimap-btn" title="Calendar">📅</button>
+                    <button class="minimap-btn" title="Mail">✉️</button>
+                    <button class="minimap-btn" title="Tracking">🔍</button>
+                </div>
+            </div>
+
+            <!-- Experience Bar -->
+            <div id="experience-bar">
+                <div class="xp-fill"></div>
+                <span class="xp-text">0 / 1000 XP</span>
+            </div>
+
+            <!-- Bags -->
+            <div id="bag-bar">
+                <div class="bag-slot" data-bag="0">🎒</div>
+                <div class="bag-slot" data-bag="1">💼</div>
+                <div class="bag-slot" data-bag="2">💼</div>
+                <div class="bag-slot" data-bag="3">💼</div>
+                <div class="bag-slot" data-bag="4">💼</div>
+            </div>
+
+            <!-- Inventory Window -->
+            <div id="inventory-window" class="game-window" style="display: none;">
+                <div class="window-header">
+                    <h3>Inventory</h3>
+                    <button class="close-btn">×</button>
+                </div>
+                <div class="inventory-grid"></div>
+                <div class="currency-display">
+                    <span class="gold">0</span>
+                    <span class="silver">0</span>
+                    <span class="copper">0</span>
+                </div>
+            </div>
+
+            <!-- Character Window -->
+            <div id="character-window" class="game-window" style="display: none;">
+                <div class="window-header">
+                    <h3>Character</h3>
+                    <button class="close-btn">×</button>
+                </div>
+                <div class="character-stats">
+                    <div class="equipment-slots">
+                        <div class="equip-slot" data-slot="head">Head</div>
+                        <div class="equip-slot" data-slot="neck">Neck</div>
+                        <div class="equip-slot" data-slot="shoulders">Shoulders</div>
+                        <div class="equip-slot" data-slot="chest">Chest</div>
+                        <div class="equip-slot" data-slot="waist">Waist</div>
+                        <div class="equip-slot" data-slot="legs">Legs</div>
+                        <div class="equip-slot" data-slot="feet">Feet</div>
+                        <div class="equip-slot" data-slot="wrists">Wrists</div>
+                        <div class="equip-slot" data-slot="hands">Hands</div>
+                        <div class="equip-slot" data-slot="finger1">Ring</div>
+                        <div class="equip-slot" data-slot="finger2">Ring</div>
+                        <div class="equip-slot" data-slot="trinket1">Trinket</div>
+                        <div class="equip-slot" data-slot="trinket2">Trinket</div>
+                        <div class="equip-slot" data-slot="mainhand">Main Hand</div>
+                        <div class="equip-slot" data-slot="offhand">Off Hand</div>
+                    </div>
+                    <div class="stats-panel">
+                        <h4>Attributes</h4>
+                        <div class="stat-line">Strength: <span id="stat-strength">10</span></div>
+                        <div class="stat-line">Agility: <span id="stat-agility">10</span></div>
+                        <div class="stat-line">Intellect: <span id="stat-intellect">10</span></div>
+                        <div class="stat-line">Stamina: <span id="stat-stamina">10</span></div>
+                        <div class="stat-line">Spirit: <span id="stat-spirit">10</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quest Log -->
+            <div id="quest-log" class="game-window" style="display: none;">
+                <div class="window-header">
+                    <h3>Quest Log</h3>
+                    <button class="close-btn">×</button>
+                </div>
+                <div class="quest-list"></div>
+                <div class="quest-details"></div>
+            </div>
+
+            <!-- Spellbook -->
+            <div id="spellbook" class="game-window" style="display: none;">
+                <div class="window-header">
+                    <h3>Spellbook & Abilities</h3>
+                    <button class="close-btn">×</button>
+                </div>
+                <div class="spell-tabs">
+                    <div class="spell-tab active">General</div>
+                    <div class="spell-tab">Class</div>
+                    <div class="spell-tab">Professions</div>
+                </div>
+                <div class="spell-list"></div>
+            </div>
+
+            <!-- Talent Window -->
+            <div id="talent-window" class="game-window" style="display: none;">
+                <div class="window-header">
+                    <h3>Talents</h3>
+                    <button class="close-btn">×</button>
+                </div>
+                <div class="talent-trees">
+                    <div class="talent-tree" data-tree="1">
+                        <h4>Tree 1</h4>
+                        <div class="talent-grid"></div>
+                    </div>
+                    <div class="talent-tree" data-tree="2">
+                        <h4>Tree 2</h4>
+                        <div class="talent-grid"></div>
+                    </div>
+                    <div class="talent-tree" data-tree="3">
+                        <h4>Tree 3</h4>
+                        <div class="talent-grid"></div>
+                    </div>
+                </div>
+                <div class="talent-points">Points: <span id="available-points">0</span></div>
+            </div>
+
+            <!-- Map Window -->
+            <div id="map-window" class="game-window" style="display: none;">
+                <div class="window-header">
+                    <h3>World Map</h3>
+                    <button class="close-btn">×</button>
+                </div>
+                <canvas id="world-map-canvas"></canvas>
+            </div>
+
+            <!-- Social Window -->
+            <div id="social-window" class="game-window" style="display: none;">
+                <div class="window-header">
+                    <h3>Social</h3>
+                    <button class="close-btn">×</button>
+                </div>
+                <div class="social-tabs">
+                    <div class="social-tab active">Friends</div>
+                    <div class="social-tab">Guild</div>
+                    <div class="social-tab">Raid</div>
+                </div>
+                <div class="social-list"></div>
+            </div>
+
+            <!-- Menu Bar -->
+            <div id="menu-bar">
+                <button class="menu-btn" data-window="character-window">Character (C)</button>
+                <button class="menu-btn" data-window="inventory-window">Inventory (B)</button>
+                <button class="menu-btn" data-window="spellbook">Spellbook (P)</button>
+                <button class="menu-btn" data-window="talent-window">Talents (N)</button>
+                <button class="menu-btn" data-window="quest-log">Quests (L)</button>
+                <button class="menu-btn" data-window="map-window">Map (M)</button>
+                <button class="menu-btn" data-window="social-window">Social (O)</button>
+                <button class="menu-btn" id="menu-btn">Menu (Esc)</button>
+            </div>
+
+            <!-- Buff/Debuff Display -->
+            <div id="buff-bar">
+                <div class="buff-container" id="buffs"></div>
+                <div class="debuff-container" id="debuffs"></div>
+            </div>
+
+            <!-- Cast Bar -->
+            <div id="cast-bar" style="display: none;">
+                <div class="cast-progress"></div>
+                <span class="cast-text">Casting...</span>
+            </div>
+
+            <!-- Combat Text -->
+            <div id="combat-text-container"></div>
+
+            <!-- Tooltip -->
+            <div id="tooltip" style="display: none;"></div>
+
+            <!-- Loot Window -->
+            <div id="loot-window" class="game-window" style="display: none;">
+                <div class="window-header">
+                    <h3>Loot</h3>
+                    <button class="close-btn">×</button>
+                </div>
+                <div class="loot-items"></div>
+            </div>
+
+            <!-- Trade Window -->
+            <div id="trade-window" class="game-window" style="display: none;">
+                <div class="window-header">
+                    <h3>Trade</h3>
+                    <button class="close-btn">×</button>
+                </div>
+                <div class="trade-panels">
+                    <div class="trade-panel player">
+                        <h4>You</h4>
+                        <div class="trade-slots"></div>
+                        <input type="number" class="trade-gold" placeholder="Gold">
+                    </div>
+                    <div class="trade-panel other">
+                        <h4>Them</h4>
+                        <div class="trade-slots"></div>
+                        <div class="trade-gold-display">0g</div>
+                    </div>
+                </div>
+                <button class="trade-accept">Accept Trade</button>
+            </div>
+
+            <!-- Achievement Notification -->
+            <div id="achievement-notification" style="display: none;">
+                <h3>Achievement Earned!</h3>
+                <p class="achievement-name"></p>
+            </div>
+
+            <!-- Zone Text -->
+            <div id="zone-text" style="display: none;">
+                <h2 class="zone-name"></h2>
+                <p class="subzone-name"></p>
+            </div>
+
+            <!-- PvP Score -->
+            <div id="pvp-score" style="display: none;">
+                <div class="faction-score alliance">Alliance: <span>0</span></div>
+                <div class="faction-score horde">Horde: <span>0</span></div>
+            </div>
+
+            <!-- Guild Panel -->
+            <div id="guild-panel" style="display: none;">
+                <div class="guild-info">
+                    <h4 class="guild-name">No Guild</h4>
+                    <p class="guild-motto"></p>
+                </div>
+            </div>
+
+            <!-- Dungeon/Raid Info -->
+            <div id="instance-info" style="display: none;">
+                <h3 class="instance-name"></h3>
+                <div class="boss-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <!-- Core game systems -->
+    <script src="js/entity.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/player.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/combat.js"></script>
+    <script src="js/inventory.js"></script>
+    <script src="js/quests.js"></script>
+    <script src="js/skills.js"></script>
+    <script src="js/social.js"></script>
+    
+    <!-- Modular world system - Load in dependency order -->
+    <!-- Foundation components first -->
+    <script src="js/world/data/EnemyDefinitions.js"></script>
+    <script src="js/world/TerrainManager.js"></script>
+    <script src="js/world/WeatherManager.js"></script>
+    <script src="js/world/EnvironmentManager.js"></script>
+    <script src="js/world/MapManager.js"></script>
+    <script src="js/world/EntityFactory.js"></script>
+    
+    <!-- Enemy systems -->
+    <script src="js/world/EnemySpawnManager.js"></script>
+    <script src="js/world/EnemyBehaviorSystem.js"></script>
+    <script src="js/world/EnemyInteractionSystem.js"></script>
+    
+    <!-- Base classes -->
+    <script src="js/world/BaseArea.js"></script>
+    
+    <!-- Area implementations -->
+    <script src="js/world/areas/ElwynnForest.js"></script>
+    <script src="js/world/areas/Westfall.js"></script>
+    <script src="js/world/areas/Goldshire.js"></script>
+    
+    <!-- Managers that depend on areas -->
+    <script src="js/world/AreaManager.js"></script>
+    <script src="js/world/WorldManager.js"></script>
+    
+    <!-- Admin Panel -->
+    <script src="js/AdminPanel.js"></script>
+    
+    <!-- Legacy world compatibility layer -->
+    <script src="js/world.js"></script>
+    
+    <!-- Main initialization -->
+    <script src="js/main.js"></script>
+</body>
+</html>
