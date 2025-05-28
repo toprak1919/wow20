@@ -23,6 +23,9 @@ class BaseArea {
         this.ambientSounds = config.ambientSounds || [];
         this.music = config.music || null;
         
+        // Terrain modifications
+        this.terrainMods = config.terrainMods || [];
+        
         // Content arrays
         this.enemySpawns = [];
         this.npcSpawns = [];
@@ -55,6 +58,12 @@ class BaseArea {
         console.log(`Loading area: ${this.name}`);
         
         try {
+            // Apply terrain modifications first
+            this.applyTerrainMods();
+            
+            // Set biome for this area
+            this.applyBiome();
+            
             // Load area assets if needed
             await this.loadAssets();
             
@@ -79,6 +88,42 @@ class BaseArea {
         }
     }
     
+    applyTerrainMods() {
+        if (!this.worldManager || !this.worldManager.terrainManager) return;
+        
+        // Apply all terrain modifications for this area
+        this.terrainMods.forEach(mod => {
+            this.worldManager.terrainManager.registerAreaTerrainMod(this.id + '_' + mod.id, {
+                position: mod.position || this.position,
+                radius: mod.radius || this.radius * 0.8,
+                type: mod.type,
+                strength: mod.strength || 1.0,
+                ...mod
+            });
+        });
+    }
+    
+    applyBiome() {
+        if (!this.worldManager || !this.worldManager.terrainManager) return;
+        
+        // Set biome for the entire area
+        const biomeRadius = this.radius || 100;
+        const gridSize = 50; // Biome grid size
+        const steps = Math.ceil(biomeRadius * 2 / gridSize);
+        
+        for (let x = -steps; x <= steps; x++) {
+            for (let z = -steps; z <= steps; z++) {
+                const worldX = this.position.x + x * gridSize;
+                const worldZ = this.position.z + z * gridSize;
+                
+                const distance = Math.sqrt(worldX * worldX + worldZ * worldZ);
+                if (distance <= biomeRadius) {
+                    this.worldManager.terrainManager.setBiomeAtPosition(worldX, worldZ, this.biome);
+                }
+            }
+        }
+    }
+    
     async loadAssets() {
         // Override in subclasses to load specific assets
         return Promise.resolve();
@@ -88,6 +133,9 @@ class BaseArea {
         if (!this.loaded) return;
         
         console.log(`Unloading area: ${this.name}`);
+        
+        // Remove terrain modifications
+        this.removeTerrainMods();
         
         // Clear spawns
         this.enemySpawns = [];
@@ -102,6 +150,94 @@ class BaseArea {
         }
         
         this.loaded = false;
+    }
+    
+    removeTerrainMods() {
+        if (!this.worldManager || !this.worldManager.terrainManager) return;
+        
+        // Remove all terrain modifications for this area
+        this.terrainMods.forEach(mod => {
+            this.worldManager.terrainManager.removeAreaTerrainMod(this.id + '_' + mod.id);
+        });
+    }
+    
+    // Terrain modification helper methods
+    addTerrainMod(modConfig) {
+        const mod = {
+            id: modConfig.id || `mod_${this.terrainMods.length}`,
+            type: modConfig.type || 'flatten',
+            position: modConfig.position || this.position,
+            radius: modConfig.radius || this.radius * 0.5,
+            strength: modConfig.strength || 1.0,
+            ...modConfig
+        };
+        
+        this.terrainMods.push(mod);
+        
+        // Apply immediately if area is loaded
+        if (this.loaded && this.worldManager && this.worldManager.terrainManager) {
+            this.worldManager.terrainManager.registerAreaTerrainMod(this.id + '_' + mod.id, mod);
+        }
+        
+        return mod;
+    }
+    
+    // Predefined terrain modification helpers
+    flattenArea(position, radius, targetHeight = 5, strength = 1.0) {
+        return this.addTerrainMod({
+            id: `flatten_${position.x}_${position.z}`,
+            type: 'flatten',
+            position: position,
+            radius: radius,
+            targetHeight: targetHeight,
+            strength: strength
+        });
+    }
+    
+    raiseArea(position, radius, amount = 10, strength = 1.0) {
+        return this.addTerrainMod({
+            id: `raise_${position.x}_${position.z}`,
+            type: 'raise',
+            position: position,
+            radius: radius,
+            amount: amount,
+            strength: strength
+        });
+    }
+    
+    lowerArea(position, radius, amount = 10, strength = 1.0) {
+        return this.addTerrainMod({
+            id: `lower_${position.x}_${position.z}`,
+            type: 'lower',
+            position: position,
+            radius: radius,
+            amount: amount,
+            strength: strength
+        });
+    }
+    
+    addNoiseToArea(position, radius, amplitude = 5, frequency = 0.1, strength = 1.0) {
+        return this.addTerrainMod({
+            id: `noise_${position.x}_${position.z}`,
+            type: 'noise',
+            position: position,
+            radius: radius,
+            amplitude: amplitude,
+            frequency: frequency,
+            strength: strength
+        });
+    }
+    
+    createPlateau(position, radius, minHeight = 10, plateauHeight = 15, strength = 1.0) {
+        return this.addTerrainMod({
+            id: `plateau_${position.x}_${position.z}`,
+            type: 'plateau',
+            position: position,
+            radius: radius,
+            minHeight: minHeight,
+            plateauHeight: plateauHeight,
+            strength: strength
+        });
     }
     
     update(deltaTime) {
