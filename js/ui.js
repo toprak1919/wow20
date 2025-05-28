@@ -441,10 +441,10 @@ class UI {
         container.innerHTML = `
             <div id="joystick"><div class="stick"></div></div>
             <div class="mobile-buttons">
-                <button class="mobile-action" data-ability="1">1</button>
-                <button class="mobile-action" data-ability="2">2</button>
-                <button class="mobile-action" data-ability="3">3</button>
-                <button class="mobile-action" data-ability="4">4</button>
+                <button class="mobile-action" data-ability="1" aria-label="Activate ability 1">1</button>
+                <button class="mobile-action" data-ability="2" aria-label="Activate ability 2">2</button>
+                <button class="mobile-action" data-ability="3" aria-label="Activate ability 3">3</button>
+                <button class="mobile-action" data-ability="4" aria-label="Activate ability 4">4</button>
             </div>
         `;
         const uiOverlay = document.getElementById('ui-overlay');
