@@ -20,6 +20,7 @@ class MapManager {
         this.exploredAreas = new Set();
         this.discoveredPOIs = new Map();
         this.mapTexture = null;
+        this.areaTerrainCache = new Map();
         
         // Colors for different map elements
         this.colors = {
@@ -29,13 +30,16 @@ class MapManager {
             mountain: '#8b7355',
             sand: '#f4a460',
             forest: '#006400',
+            plains: '#90EE90',
+            desert: '#F4A460',
             town: '#ffd700',
             player: '#ff0000',
             poi: '#ffff00',
             enemy: '#cc0000',
             npc: '#00ff00',
             unexplored: '#1a1a1a',
-            border: '#444444'
+            border: '#444444',
+            areaInfluence: '#66ff66'
         };
         
         // POI types
@@ -50,7 +54,9 @@ class MapManager {
             quest_giver: '❗',
             quest_turn_in: '❓',
             resource: '💎',
-            vendor: '💰'
+            vendor: '💰',
+            watchtower: '🗼',
+            bridge: '🌉'
         };
     }
     
@@ -83,7 +89,7 @@ class MapManager {
     }
     
     generateMapTexture() {
-        console.log('Generating map texture...');
+        console.log('Generating enhanced map texture...');
         
         // Create off-screen canvas for map texture
         const canvas = document.createElement('canvas');
@@ -95,17 +101,21 @@ class MapManager {
         ctx.fillStyle = this.colors.background;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
-        // Generate terrain-based map
-        this.generateTerrainMap(ctx);
+        // Generate terrain-based map with area modifications
+        this.generateEnhancedTerrainMap(ctx);
         
-        // Add area boundaries
+        // Add area-specific biome overlays
+        this.drawBiomeOverlays(ctx);
+        
+        // Add area boundaries and terrain modifications
         this.drawAreaBoundaries(ctx);
+        this.drawTerrainModifications(ctx);
         
         // Store the texture
         this.mapTexture = canvas;
     }
     
-    generateTerrainMap(ctx) {
+    generateEnhancedTerrainMap(ctx) {
         const terrainManager = this.worldManager.terrainManager;
         if (!terrainManager || !terrainManager.heightMap) return;
         
@@ -113,28 +123,24 @@ class MapManager {
         const segments = terrainManager.segments;
         const worldSize = this.worldManager.worldSize;
         
-        // Convert heightmap to map colors
+        // Convert heightmap to map colors with area-aware terrain
         for (let i = 0; i < segments; i++) {
             for (let j = 0; j < segments; j++) {
                 const height = heightMap[i] && heightMap[i][j] ? heightMap[i][j] : 0;
                 
-                // Convert world coordinates to map coordinates
-                const mapX = (i / segments) * this.worldMapSize.width;
-                const mapY = (j / segments) * this.worldMapSize.height;
+                // Convert grid indices to world coordinates
+                const worldX = (i / segments - 0.5) * worldSize;
+                const worldZ = (j / segments - 0.5) * worldSize;
                 
-                // Determine color based on height
-                let color = this.colors.grass;
-                if (height < -5) {
-                    color = this.colors.water;
-                } else if (height < 5) {
-                    color = this.colors.sand;
-                } else if (height < 20) {
-                    color = this.colors.grass;
-                } else if (height < 30) {
-                    color = this.colors.mountain;
-                } else {
-                    color = '#ffffff'; // Snow
-                }
+                // Convert world coordinates to map coordinates
+                const mapX = (worldX / worldSize + 0.5) * this.worldMapSize.width;
+                const mapY = (worldZ / worldSize + 0.5) * this.worldMapSize.height;
+                
+                // Get biome at this position
+                const biome = terrainManager.getBiomeAtPosition(worldX, worldZ);
+                
+                // Determine color based on height and biome
+                let color = this.getTerrainColor(height, biome);
                 
                 ctx.fillStyle = color;
                 ctx.fillRect(
@@ -146,15 +152,111 @@ class MapManager {
             }
         }
         
-        // Add forest overlay
-        this.addForestOverlay(ctx);
+        // Add forest overlay with area-specific density
+        this.addEnhancedForestOverlay(ctx);
     }
     
-    addForestOverlay(ctx) {
+    getTerrainColor(height, biome) {
+        if (height < -5) {
+            return this.colors.water;
+        } else if (height < 0) {
+            return '#6eb5ff'; // Shallow water
+        } else if (height < 5) {
+            return this.colors.sand;
+        } else if (height < 20) {
+            // Grass color varies by biome
+            switch (biome) {
+                case 'forest':
+                    return this.colors.forest;
+                case 'plains':
+                    return this.colors.plains;
+                case 'desert':
+                    return this.colors.desert;
+                default:
+                    return this.colors.grass;
+            }
+        } else if (height < 30) {
+            return this.colors.mountain;
+        } else {
+            return '#ffffff'; // Snow
+        }
+    }
+    
+    drawBiomeOverlays(ctx) {
+        if (!this.worldManager.terrainManager) return;
+        
+        const terrainManager = this.worldManager.terrainManager;
+        const worldSize = this.worldManager.worldSize;
+        
+        // Draw biome boundaries and overlays
+        terrainManager.biomeMap.forEach((biome, key) => {
+            const [gridX, gridY] = key.split(',').map(Number);
+            const worldX = gridX * 50; // Grid size is 50
+            const worldZ = gridY * 50;
+            
+            const mapX = (worldX / worldSize + 0.5) * this.worldMapSize.width;
+            const mapY = (worldZ / worldSize + 0.5) * this.worldMapSize.height;
+            const size = (50 / worldSize) * this.worldMapSize.width;
+            
+            // Add subtle biome overlay
+            ctx.globalAlpha = 0.2;
+            switch (biome) {
+                case 'forest':
+                    ctx.fillStyle = '#003300';
+                    break;
+                case 'plains':
+                    ctx.fillStyle = '#66ff66';
+                    break;
+                case 'desert':
+                    ctx.fillStyle = '#ffcc00';
+                    break;
+                default:
+                    ctx.globalAlpha = 0;
+            }
+            
+            if (ctx.globalAlpha > 0) {
+                ctx.fillRect(mapX - size/2, mapY - size/2, size, size);
+            }
+            ctx.globalAlpha = 1.0;
+        });
+    }
+    
+    drawTerrainModifications(ctx) {
+        if (!this.worldManager.terrainManager) return;
+        
+        const terrainManager = this.worldManager.terrainManager;
+        const worldSize = this.worldManager.worldSize;
+        
+        // Draw terrain modification indicators
+        terrainManager.areaTerrainMods.forEach((mod, id) => {
+            const mapPos = this.worldToMapCoords(mod.position.x, mod.position.z);
+            const radius = (mod.radius / worldSize) * this.worldMapSize.width;
+            
+            ctx.strokeStyle = this.colors.areaInfluence;
+            ctx.lineWidth = 1;
+            ctx.globalAlpha = 0.4;
+            ctx.setLineDash([3, 3]);
+            
+            ctx.beginPath();
+            ctx.arc(mapPos.x, mapPos.y, radius, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Add modification type indicator
+            ctx.fillStyle = this.colors.areaInfluence;
+            ctx.font = '8px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(mod.type.charAt(0).toUpperCase(), mapPos.x, mapPos.y + 3);
+            
+            ctx.globalAlpha = 1.0;
+            ctx.setLineDash([]);
+        });
+    }
+    
+    addEnhancedForestOverlay(ctx) {
         const environmentManager = this.worldManager.environmentManager;
         if (!environmentManager) return;
         
-        // Create forest density map
+        // Create forest density map with area awareness
         const forestDensity = new Map();
         const gridSize = 20;
         
@@ -166,16 +268,19 @@ class MapManager {
             forestDensity.set(key, (forestDensity.get(key) || 0) + 1);
         });
         
-        // Draw forest areas
+        // Draw forest areas with varying intensity
         forestDensity.forEach((density, key) => {
-            if (density > 3) { // Minimum trees for forest
+            if (density > 2) { // Minimum trees for forest indication
                 const [gridX, gridY] = key.split(',').map(Number);
-                const mapX = (gridX * gridSize / this.worldManager.worldSize) * this.worldMapSize.width;
-                const mapY = (gridY * gridSize / this.worldManager.worldSize) * this.worldMapSize.height;
+                const worldX = (gridX * gridSize) - this.worldManager.worldSize / 2;
+                const worldZ = (gridY * gridSize) - this.worldManager.worldSize / 2;
+                
+                const mapX = (worldX / this.worldManager.worldSize + 0.5) * this.worldMapSize.width;
+                const mapY = (worldZ / this.worldManager.worldSize + 0.5) * this.worldMapSize.height;
                 const size = (gridSize / this.worldManager.worldSize) * this.worldMapSize.width;
                 
                 ctx.fillStyle = this.colors.forest;
-                ctx.globalAlpha = Math.min(density / 10, 0.7);
+                ctx.globalAlpha = Math.min(density / 15, 0.8);
                 ctx.fillRect(mapX, mapY, size, size);
                 ctx.globalAlpha = 1.0;
             }
@@ -191,17 +296,20 @@ class MapManager {
         
         this.worldManager.areaManager.areas.forEach(area => {
             const mapPos = this.worldToMapCoords(area.position.x, area.position.z);
-            const radius = area.radius * this.mapScale;
+            const radius = (area.radius / this.worldManager.worldSize) * this.worldMapSize.width;
             
             ctx.beginPath();
             ctx.arc(mapPos.x, mapPos.y, radius, 0, Math.PI * 2);
             ctx.stroke();
             
-            // Area label
+            // Area label with background
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillRect(mapPos.x - 40, mapPos.y - radius - 20, 80, 16);
+            
             ctx.fillStyle = '#ffffff';
             ctx.font = '12px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText(area.name, mapPos.x, mapPos.y - radius - 5);
+            ctx.fillText(area.name, mapPos.x, mapPos.y - radius - 8);
         });
         
         ctx.setLineDash([]);
@@ -236,8 +344,9 @@ class MapManager {
         
         // Move player to clicked location (if accessible)
         if (this.game.player) {
-            this.game.player.moveToPosition(new THREE.Vector3(worldPos.x, 0, worldPos.y));
-            console.log(`Moving player to world position: ${worldPos.x}, ${worldPos.y}`);
+            const height = this.worldManager.getHeightAtPosition(worldPos.x, worldPos.y);
+            this.game.player.moveToPosition(new THREE.Vector3(worldPos.x, height + 1, worldPos.y));
+            console.log(`Moving player to world position: ${worldPos.x}, ${worldPos.y} (height: ${height})`);
         }
     }
     
@@ -253,7 +362,10 @@ class MapManager {
         if (poi) {
             this.showMapTooltip(event, poi);
         } else {
-            this.hideMapTooltip();
+            // Show terrain info
+            const height = this.worldManager.getHeightAtPosition(worldPos.x, worldPos.y);
+            const biome = this.worldManager.terrainManager?.getBiomeAtPosition(worldPos.x, worldPos.y) || 'unknown';
+            this.showTerrainTooltip(event, { height, biome, worldPos });
         }
     }
     
@@ -274,8 +386,9 @@ class MapManager {
         
         const worldX = player.position.x + offsetX;
         const worldZ = player.position.z + offsetY;
+        const height = this.worldManager.getHeightAtPosition(worldX, worldZ);
         
-        player.moveToPosition(new THREE.Vector3(worldX, 0, worldZ));
+        player.moveToPosition(new THREE.Vector3(worldX, height + 1, worldZ));
     }
     
     update(deltaTime) {
@@ -306,10 +419,32 @@ class MapManager {
     }
     
     drawMinimapTerrain(ctx, playerPos) {
-        // Simplified terrain rendering for minimap
+        // Enhanced terrain rendering for minimap
         const centerX = this.minimapSize.width / 2;
         const centerY = this.minimapSize.height / 2;
         const scale = this.minimapSize.width / (this.minimapZoom * 2);
+        
+        // Draw terrain in a grid around player
+        const gridSize = 10;
+        const steps = Math.ceil(this.minimapZoom / gridSize);
+        
+        for (let x = -steps; x <= steps; x++) {
+            for (let y = -steps; y <= steps; y++) {
+                const worldX = playerPos.x + x * gridSize;
+                const worldZ = playerPos.z + y * gridSize;
+                
+                const height = this.worldManager.getHeightAtPosition(worldX, worldZ);
+                const biome = this.worldManager.terrainManager?.getBiomeAtPosition(worldX, worldZ) || 'temperate';
+                
+                const mapX = centerX + x * gridSize * scale;
+                const mapY = centerY + y * gridSize * scale;
+                const size = gridSize * scale;
+                
+                const color = this.getTerrainColor(height, biome);
+                ctx.fillStyle = color;
+                ctx.fillRect(mapX - size/2, mapY - size/2, size, size);
+            }
+        }
         
         // Draw current area
         const currentArea = this.worldManager.currentArea;
@@ -318,11 +453,12 @@ class MapManager {
             const areaY = centerY + (currentArea.position.z - playerPos.z) * scale;
             const areaRadius = currentArea.radius * scale;
             
-            ctx.fillStyle = this.colors.grass;
-            ctx.globalAlpha = 0.3;
+            ctx.strokeStyle = this.colors.areaInfluence;
+            ctx.lineWidth = 1;
+            ctx.globalAlpha = 0.6;
             ctx.beginPath();
             ctx.arc(areaX, areaY, areaRadius, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.stroke();
             ctx.globalAlpha = 1.0;
         }
     }
@@ -344,15 +480,21 @@ class MapManager {
                 const entityY = centerY + (entity.position.z - playerPos.z) * scale;
                 
                 let color = this.colors.npc;
+                let size = 2;
                 if (entity.type === 'enemy') {
                     color = this.colors.enemy;
+                    size = 3;
                 } else if (entity.type === 'resource') {
                     color = this.colors.poi;
+                    size = 2;
+                } else if (entity.type === 'structure') {
+                    color = this.colors.town;
+                    size = 4;
                 }
                 
                 ctx.fillStyle = color;
                 ctx.beginPath();
-                ctx.arc(entityX, entityY, 2, 0, Math.PI * 2);
+                ctx.arc(entityX, entityY, size, 0, Math.PI * 2);
                 ctx.fill();
             }
         });
@@ -409,6 +551,22 @@ class MapManager {
             ctx.beginPath();
             ctx.arc(playerMapPos.x, playerMapPos.y, 4, 0, Math.PI * 2);
             ctx.fill();
+            
+            // Player direction indicator
+            if (this.game.player.rotation) {
+                const arrowLength = 12;
+                const angle = this.game.player.rotation.y;
+                
+                ctx.strokeStyle = this.colors.player;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(playerMapPos.x, playerMapPos.y);
+                ctx.lineTo(
+                    playerMapPos.x + Math.sin(angle) * arrowLength,
+                    playerMapPos.y - Math.cos(angle) * arrowLength
+                );
+                ctx.stroke();
+            }
         }
         
         // Draw fog of war for unexplored areas
@@ -473,7 +631,7 @@ class MapManager {
             const area = this.worldManager.areaManager.getArea(areaId);
             if (area) {
                 const areaMapPos = this.worldToMapCoords(area.position.x, area.position.z);
-                const areaRadius = area.radius * this.mapScale;
+                const areaRadius = (area.radius / this.worldManager.worldSize) * this.worldMapSize.width;
                 
                 ctx.beginPath();
                 ctx.arc(areaMapPos.x, areaMapPos.y, areaRadius, 0, Math.PI * 2);
@@ -504,12 +662,12 @@ class MapManager {
         });
         
         // Add structure POIs
-        if (area.structures) {
-            area.structures.forEach(structure => {
+        if (area.structureSpawns) {
+            area.structureSpawns.forEach(structure => {
                 this.addPOI(structure.position.x, structure.position.z, {
-                    name: structure.name,
-                    type: structure.type,
-                    description: structure.description
+                    name: structure.config.name || structure.structureType,
+                    type: structure.structureType,
+                    description: `A ${structure.structureType} in ${area.name}`
                 });
             });
         }
@@ -544,6 +702,21 @@ class MapManager {
                 <strong>${poi.name}</strong><br>
                 Type: ${poi.type}<br>
                 ${poi.description ? poi.description : ''}
+            `;
+            tooltip.style.display = 'block';
+            tooltip.style.left = event.pageX + 10 + 'px';
+            tooltip.style.top = event.pageY + 10 + 'px';
+        }
+    }
+    
+    showTerrainTooltip(event, data) {
+        const tooltip = document.getElementById('tooltip');
+        if (tooltip) {
+            tooltip.innerHTML = `
+                <strong>Terrain Info</strong><br>
+                Height: ${data.height.toFixed(1)}<br>
+                Biome: ${data.biome}<br>
+                Position: ${data.worldPos.x.toFixed(0)}, ${data.worldPos.y.toFixed(0)}
             `;
             tooltip.style.display = 'block';
             tooltip.style.left = event.pageX + 10 + 'px';
@@ -589,6 +762,11 @@ class MapManager {
         return totalAreas > 0 ? (exploredAreas / totalAreas) * 100 : 0;
     }
     
+    regenerateMapTexture() {
+        console.log('Regenerating map texture due to terrain changes...');
+        this.generateMapTexture();
+    }
+    
     dispose() {
         // Clean up event listeners and resources
         if (this.worldMapCanvas) {
@@ -602,5 +780,6 @@ class MapManager {
         
         this.exploredAreas.clear();
         this.discoveredPOIs.clear();
+        this.areaTerrainCache.clear();
     }
 }

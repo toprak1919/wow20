@@ -99,6 +99,9 @@ class WorldManager {
         console.log(`Loading area: ${area.name}`);
         
         try {
+            // Set worldManager reference for the area
+            area.worldManager = this;
+            
             // Initialize area content if not already done
             if (!area.initialized) {
                 await area.initialize();

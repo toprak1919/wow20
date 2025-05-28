@@ -9,7 +9,7 @@ class ElwynnForest extends BaseArea {
             radius: 200,
             levelRange: { min: 1, max: 10 },
             faction: 'alliance',
-            biome: 'temperate_forest',
+            biome: 'forest',
             weather: 'clear',
             music: 'elwynn_theme',
             ambientSounds: ['birds', 'wind_light', 'leaves_rustling']
@@ -19,6 +19,32 @@ class ElwynnForest extends BaseArea {
     initializeContent() {
         // This area contains Goldshire and surrounding forests
         console.log('Initializing Elwynn Forest content...');
+        
+        // Create terrain modifications for this area
+        this.setupTerrainMods();
+    }
+    
+    setupTerrainMods() {
+        // Flatten Goldshire area for the town
+        this.flattenArea({ x: 50, z: 50 }, 40, 5, 0.8);
+        
+        // Create gentle hills around the forest
+        this.addNoiseToArea({ x: -50, z: -50 }, 80, 8, 0.05, 0.6);
+        this.addNoiseToArea({ x: 100, z: -30 }, 60, 6, 0.08, 0.5);
+        
+        // Create a small plateau for the watchtower
+        this.createPlateau({ x: 20, z: 80 }, 25, 8, 12, 0.7);
+        this.createPlateau({ x: -20, z: 20 }, 25, 8, 12, 0.7);
+        
+        // Lower area near the lake (if any water areas)
+        this.lowerArea({ x: -80, z: 60 }, 30, 8, 0.9);
+        
+        // Add some rolling hills for visual interest
+        this.raiseArea({ x: 70, z: -70 }, 35, 12, 0.6);
+        this.raiseArea({ x: -60, z: -80 }, 40, 10, 0.5);
+        
+        // Create a valley path between areas
+        this.lowerArea({ x: 0, z: 100 }, 50, 5, 0.4);
     }
     
     generateEnemySpawns() {
@@ -63,7 +89,7 @@ class ElwynnForest extends BaseArea {
             }
         );
         
-        // Rare spawn - Elite Bear
+        // Rare spawn - Elite Bear in the hills
         this.addEnemySpawn('bear',
             { x: -50, y: 1, z: 70 },
             {
@@ -75,9 +101,9 @@ class ElwynnForest extends BaseArea {
             }
         );
         
-        // Spider nest
+        // Spider nest in the lowered valley
         this.addEnemySpawn('spider',
-            { x: 30, y: 1, z: -30 },
+            { x: -80, y: 1, z: 60 },
             {
                 level: 1,
                 spawnType: 'pack_spawn',
@@ -87,9 +113,9 @@ class ElwynnForest extends BaseArea {
             }
         );
         
-        // Bandit camp guards
+        // Bandit camp guards on the raised hill
         this.addEnemySpawn('bandit',
-            { x: 90, y: 1, z: 80 },
+            { x: 70, y: 1, z: -70 },
             {
                 level: 2,
                 spawnType: 'guard',
@@ -100,7 +126,7 @@ class ElwynnForest extends BaseArea {
         );
         
         // Random forest creatures
-        const randomSpawnCount = 10;
+        const randomSpawnCount = 15;
         const randomEnemyTypes = ['wolf', 'spider', 'kobold', 'bear'];
         
         for (let i = 0; i < randomSpawnCount; i++) {
@@ -133,7 +159,7 @@ class ElwynnForest extends BaseArea {
     }
     
     generateNPCSpawns() {
-        // Goldshire NPCs
+        // Goldshire NPCs (on the flattened area)
         this.addNPCSpawn('marshal_dughan', 
             { x: 50, y: 1, z: 50 }, 
             { questGiver: true, questId: 'protect_goldshire' }
@@ -149,6 +175,17 @@ class ElwynnForest extends BaseArea {
             { guard: true }
         );
         
+        // Tower guards on the plateaus
+        this.addNPCSpawn('tower_guard', 
+            { x: 20, y: 1, z: 80 }, 
+            { guard: true, stationaryGuard: true }
+        );
+        
+        this.addNPCSpawn('tower_guard', 
+            { x: -20, y: 1, z: 20 }, 
+            { guard: true, stationaryGuard: true }
+        );
+        
         // Patrol guards
         for (let i = 0; i < 3; i++) {
             const position = this.getValidSpawnPosition();
@@ -161,7 +198,7 @@ class ElwynnForest extends BaseArea {
     
     generateResourceSpawns() {
         const resourceTypes = this.getAreaResourceTypes();
-        const resourceCount = 20;
+        const resourceCount = 25;
         
         for (let i = 0; i < resourceCount; i++) {
             const position = this.getValidSpawnPosition();
@@ -172,10 +209,23 @@ class ElwynnForest extends BaseArea {
                 skillRequired: Math.floor(Math.random() * 50) + 1
             });
         }
+        
+        // Special mining nodes on hills
+        this.addResourceSpawn('copper_vein', { x: 70, y: 1, z: -70 }, {
+            respawnTime: 600,
+            skillRequired: 1,
+            yield: 2
+        });
+        
+        this.addResourceSpawn('copper_vein', { x: -60, y: 1, z: -80 }, {
+            respawnTime: 600,
+            skillRequired: 1,
+            yield: 2
+        });
     }
     
     generateStructureSpawns() {
-        // Goldshire buildings
+        // Goldshire buildings (on the flattened area)
         this.addStructureSpawn('inn', 
             { x: 48, y: 0, z: 52 }, 
             { name: "Lion's Pride Inn" }
@@ -196,7 +246,7 @@ class ElwynnForest extends BaseArea {
             { name: "Stonefield Farm" }
         );
         
-        // Watch towers
+        // Watch towers (on the plateaus)
         this.addStructureSpawn('watchtower', 
             { x: 20, y: 0, z: 80 }, 
             { name: "East Watchtower" }
@@ -205,6 +255,12 @@ class ElwynnForest extends BaseArea {
         this.addStructureSpawn('watchtower', 
             { x: -20, y: 0, z: 20 }, 
             { name: "West Watchtower" }
+        );
+        
+        // Bridge across the valley
+        this.addStructureSpawn('bridge', 
+            { x: 0, y: 0, z: 100 }, 
+            { name: "Forest Bridge" }
         );
     }
     
