@@ -253,15 +253,21 @@ class Controls {
         
         let touchStartX = 0;
         let touchStartY = 0;
+        let startTime = 0;
         let initialDistance = 0;
+        let isPinching = false;
+        let lastTap = 0;
         
         // Touch start
         gameContainer.addEventListener('touchstart', (event) => {
             if (event.touches.length === 1) {
+                isPinching = false;
+                startTime = Date.now();
                 touchStartX = event.touches[0].clientX;
                 touchStartY = event.touches[0].clientY;
             } else if (event.touches.length === 2) {
                 // Pinch zoom setup
+                isPinching = true;
                 const dx = event.touches[0].clientX - event.touches[1].clientX;
                 const dy = event.touches[0].clientY - event.touches[1].clientY;
                 initialDistance = Math.sqrt(dx * dx + dy * dy);
@@ -271,41 +277,78 @@ class Controls {
         // Touch move
         gameContainer.addEventListener('touchmove', (event) => {
             event.preventDefault();
-            
-            if (event.touches.length === 1) {
+
+            if (event.touches.length === 1 && !isPinching) {
                 // Single touch - camera rotation
                 const deltaX = event.touches[0].clientX - touchStartX;
                 const deltaY = event.touches[0].clientY - touchStartY;
-                
+
                 this.cameraRotation.y += deltaX * this.cameraSensitivity;
                 this.cameraRotation.x = Math.max(
                     -Math.PI / 3,
-                    Math.min(Math.PI / 3, 
+                    Math.min(Math.PI / 3,
                         this.cameraRotation.x + deltaY * this.cameraSensitivity
                     )
                 );
-                
+
                 touchStartX = event.touches[0].clientX;
                 touchStartY = event.touches[0].clientY;
             } else if (event.touches.length === 2) {
                 // Pinch zoom
+                isPinching = true;
                 const dx = event.touches[0].clientX - event.touches[1].clientX;
                 const dy = event.touches[0].clientY - event.touches[1].clientY;
                 const distance = Math.sqrt(dx * dx + dy * dy);
-                
+
                 const scale = distance / initialDistance;
-                this.cameraDistance = Math.max(5, 
+                this.cameraDistance = Math.max(5,
                     Math.min(50, this.cameraDistance / scale)
                 );
-                
+
                 initialDistance = distance;
             }
         });
         
         // Touch end
         gameContainer.addEventListener('touchend', (event) => {
+            if (event.touches.length === 0 && !isPinching) {
+                const endX = event.changedTouches[0].clientX;
+                const endY = event.changedTouches[0].clientY;
+                const dx = endX - touchStartX;
+                const dy = endY - touchStartY;
+                const absX = Math.abs(dx);
+                const absY = Math.abs(dy);
+                const duration = Date.now() - startTime;
+
+                if (Math.max(absX, absY) > 50 && duration < 500) {
+                    // Swipe gestures for abilities
+                    if (absX > absY) {
+                        if (dx > 0) {
+                            this.game.player.useAbility(3); // swipe right
+                        } else {
+                            this.game.player.useAbility(4); // swipe left
+                        }
+                    } else {
+                        if (dy < 0) {
+                            this.game.player.useAbility(1); // swipe up
+                        } else {
+                            this.game.player.useAbility(2); // swipe down
+                        }
+                    }
+                } else if (duration < 300) {
+                    // Tap / double tap
+                    const now = Date.now();
+                    if (now - lastTap < 300) {
+                        this.game.player.useAbility(1);
+                        lastTap = 0;
+                    } else {
+                        lastTap = now;
+                    }
+                }
+            }
+
             if (event.touches.length === 0) {
-                // All touches ended
+                isPinching = false;
             }
         });
     }

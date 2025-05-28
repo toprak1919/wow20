@@ -260,6 +260,10 @@ mapManager.addPOI(x, z, {
 - **Progressive Web App** - Offline capability and mobile optimization
 - **Real Multiplayer** - WebSocket-based server integration
 
+## 📱 Mobile Usage Tips
+
+World of WebCraft can be played on phones and tablets. When the screen width is below 768&nbsp;px the game shows an on-screen joystick and four quick-action buttons. Drag the joystick to move your character and tap the buttons to trigger the first four ability slots. Swipe gestures on the game canvas can also activate abilities.
+
 ## 📄 License
 
 This project is open source and available under the MIT License.

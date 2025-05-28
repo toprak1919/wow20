@@ -54,6 +54,7 @@ class UI {
         this.setupEventListeners();
         this.createMinimapCanvas();
         this.initializeActionBars();
+        this.createMobileControls();
         this.updateCurrency();
         this.setupChatTabs();
         this.hideAllWindows();
@@ -432,6 +433,68 @@ class UI {
                 }
             }
         }
+    }
+
+    createMobileControls() {
+        const container = document.createElement('div');
+        container.id = 'mobile-controls';
+        container.innerHTML = `
+            <div id="joystick"><div class="stick"></div></div>
+            <div class="mobile-buttons">
+                <button class="mobile-action" data-ability="1">1</button>
+                <button class="mobile-action" data-ability="2">2</button>
+                <button class="mobile-action" data-ability="3">3</button>
+                <button class="mobile-action" data-ability="4">4</button>
+            </div>
+        `;
+        document.getElementById('ui-overlay').appendChild(container);
+
+        const joystick = container.querySelector('#joystick');
+        const stick = joystick.querySelector('.stick');
+        let moving = false;
+        const center = { x: 0, y: 0 };
+
+        const reset = () => {
+            stick.style.transform = 'translate(0px, 0px)';
+            const ctrl = this.game.controls;
+            ctrl.forward = ctrl.backward = ctrl.left = ctrl.right = false;
+        };
+
+        joystick.addEventListener('touchstart', (e) => {
+            moving = true;
+            const rect = joystick.getBoundingClientRect();
+            center.x = rect.left + rect.width / 2;
+            center.y = rect.top + rect.height / 2;
+        });
+
+        joystick.addEventListener('touchmove', (e) => {
+            if (!moving) return;
+            const touch = e.touches[0];
+            const dx = touch.clientX - center.x;
+            const dy = touch.clientY - center.y;
+            const max = joystick.clientWidth / 2;
+            const angle = Math.atan2(dy, dx);
+            const dist = Math.min(max, Math.hypot(dx, dy));
+            stick.style.transform = `translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist}px)`;
+
+            const ctrl = this.game.controls;
+            ctrl.forward = dy < -10;
+            ctrl.backward = dy > 10;
+            ctrl.left = dx < -10;
+            ctrl.right = dx > 10;
+        }, { passive: true });
+
+        joystick.addEventListener('touchend', () => {
+            moving = false;
+            reset();
+        });
+
+        container.querySelectorAll('.mobile-action').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const slot = parseInt(btn.dataset.ability, 10);
+                this.game.player.useAbility(slot);
+            });
+        });
     }
     
     updateBuffs() {
