@@ -73,10 +73,18 @@ class EntityFactory {
             enemyData.armor = Math.floor(enemyDef.baseArmor * (1 + levelDiff * 0.1));
         }
         
+        // Ensure position is a THREE.Vector3
+        let vec3Position;
+        if (position instanceof THREE.Vector3) {
+            vec3Position = position;
+        } else {
+            vec3Position = new THREE.Vector3(position.x || 0, position.y || 0, position.z || 0);
+        }
+        
         // Create enemy using the Enemy class from entity.js
         const enemy = new window.Enemy(
             `enemy_${Date.now()}_${Math.random()}`,
-            position,
+            vec3Position,
             enemyData
         );
         

@@ -340,7 +340,7 @@ class EnemySpawnManager {
         }
         
         // Start patrolling
-        if (enemy.ai) {
+        if (enemy.ai && enemy.ai.setState) {
             enemy.ai.setState('patrol');
         }
     }
@@ -373,14 +373,24 @@ class EnemySpawnManager {
                         setTimeout(() => {
                             this.enemy.mesh.visible = true;
                             this.ambushConfig.isHidden = false;
-                            this.enterCombat(this.enemy.game.player);
+                            
+                            // Use the correct AI method to enter combat
+                            if (this.enterCombat && typeof this.enterCombat === 'function') {
+                                this.enterCombat(this.enemy.game.player);
+                            } else {
+                                // Fallback: set AI state to combat and target
+                                this.combatTarget = this.enemy.game.player;
+                                this.setState('combat');
+                            }
                             
                             // Ambush shout
-                            this.enemy.game.ui.showCombatText(
-                                'Ambush!', 
-                                'special', 
-                                this.enemy.position
-                            );
+                            if (this.enemy.game.ui && this.enemy.game.ui.showCombatText) {
+                                this.enemy.game.ui.showCombatText(
+                                    'Ambush!', 
+                                    'special', 
+                                    this.enemy.position
+                                );
+                            }
                         }, this.ambushConfig.ambushDelay * 1000);
                     }
                 } else {
@@ -490,22 +500,29 @@ class EnemySpawnManager {
             if (enemy.ai) {
                 enemy.ai.packLeader = packLeader;
                 
-                // Override combat behavior for pack coordination
-                const originalEnterCombat = enemy.ai.enterCombat.bind(enemy.ai);
-                enemy.ai.enterCombat = function(target) {
-                    originalEnterCombat(target);
-                    
-                    // Alert pack members
-                    const pack = spawn.currentEnemies
-                        .map(id => this.enemy.game.entities.get(id))
-                        .filter(e => e && e.alive && e !== this.enemy);
-                    
-                    pack.forEach(member => {
-                        if (member.ai && member.ai.state === 'idle') {
-                            member.ai.enterCombat(target);
-                        }
-                    });
-                }.bind(enemy.ai);
+                // Override combat behavior for pack coordination only if enterCombat exists
+                if (enemy.ai.enterCombat && typeof enemy.ai.enterCombat === 'function') {
+                    const originalEnterCombat = enemy.ai.enterCombat.bind(enemy.ai);
+                    enemy.ai.enterCombat = function(target) {
+                        originalEnterCombat(target);
+                        
+                        // Alert pack members
+                        const pack = spawn.currentEnemies
+                            .map(id => this.enemy.game.entities.get(id))
+                            .filter(e => e && e.alive && e !== this.enemy);
+                        
+                        pack.forEach(member => {
+                            if (member.ai && member.ai.enterCombat && typeof member.ai.enterCombat === 'function') {
+                                if (member.ai.state === 'idle') {
+                                    member.ai.enterCombat(target);
+                                }
+                            }
+                        });
+                    }.bind(enemy.ai);
+                } else {
+                    // Silently skip pack behavior enhancement if enterCombat is not available
+                    // The basic AI will still function normally
+                }
             }
         }
     }

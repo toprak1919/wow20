@@ -18,6 +18,9 @@ let currentStep = 0;
 document.addEventListener('DOMContentLoaded', async function() {
     console.log('Starting game initialization...');
     
+    // Wait for THREE.js to load
+    await waitForTHREE();
+    
     try {
         await initializeGame();
     } catch (error) {
@@ -25,6 +28,49 @@ document.addEventListener('DOMContentLoaded', async function() {
         showLoadingError(error.message);
     }
 });
+
+// Wait for THREE.js to be available
+function waitForTHREE() {
+    return new Promise((resolve) => {
+        if (typeof THREE !== 'undefined') {
+            console.log('THREE.js is already loaded');
+            console.log('THREE.js version:', THREE.REVISION);
+            checkCapsuleGeometry();
+            resolve();
+            return;
+        }
+        
+        console.log('Waiting for THREE.js to load...');
+        const checkTHREE = () => {
+            if (typeof THREE !== 'undefined') {
+                console.log('THREE.js loaded successfully');
+                console.log('THREE.js version:', THREE.REVISION);
+                checkCapsuleGeometry();
+                resolve();
+            } else {
+                setTimeout(checkTHREE, 100);
+            }
+        };
+        checkTHREE();
+    });
+}
+
+// Check if CapsuleGeometry is available and add fallback if not
+function checkCapsuleGeometry() {
+    if (typeof THREE.CapsuleGeometry === 'undefined') {
+        console.warn('CapsuleGeometry not available, creating fallback...');
+        
+        // Create a simple fallback using CylinderGeometry (works in all THREE.js versions)
+        THREE.CapsuleGeometry = function(radius, height, capSegments, radialSegments) {
+            // Just return a cylinder geometry as a simple fallback
+            return new THREE.CylinderGeometry(radius || 0.5, radius || 0.5, height || 1.5, radialSegments || 8);
+        };
+        
+        console.log('CapsuleGeometry fallback created successfully');
+    } else {
+        console.log('CapsuleGeometry is available natively');
+    }
+}
 
 async function initializeGame() {
     // Show loading screen
