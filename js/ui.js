@@ -447,7 +447,12 @@ class UI {
                 <button class="mobile-action" data-ability="4">4</button>
             </div>
         `;
-        document.getElementById('ui-overlay').appendChild(container);
+        const uiOverlay = document.getElementById('ui-overlay');
+        if (uiOverlay) {
+            uiOverlay.appendChild(container);
+        } else {
+            console.error("UI overlay element not found. Mobile controls could not be created.");
+        }
 
         const joystick = container.querySelector('#joystick');
         const stick = joystick.querySelector('.stick');
